@@ -8,21 +8,61 @@ from keras.layers import Input, Lambda
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
+from pascal_voc_tools import DarknetConfig
 
 from yolo3.model import preprocess_true_boxes, yolo_body, yolo_loss
 from yolo3.utils import get_random_data
 
+    
+def parse_config(cfg_file_path):
+    parser = DarknetConfig()
+    cfg_data = parser.parse(cfg_file_path)
+    return cfg_data
+
+
+def parse_yolo_layer(param):
+    yolo_layer = {}
+    yolo_layer['mask'] = list(map(int, param['mask'].split(',')))
+    yolo_layer['anchors'] = list(map(float, param['anchors'].split(',')))
+    yolo_layer['classes'] = int(param['classes'])
+    yolo_layer['num'] = int(param['num'])
+    yolo_layer['jitter'] = float(param['jitter'])
+    yolo_layer['ignore_thresh'] = float(param['ignore_thresh'])
+    # TODO:wangtf truth_thresh
+    yolo_layer['random'] = int(param['random'])
+    return yolo_layer
+
+
+def get_yolo_anchors(cfg_data):
+    for layer in cfg_data:
+        if layer.name != 'yolo':
+            continue
+        yolo_layer = parse_yolo_layer(layer.param)
+        print(yolo_layer['anchors'])
+    return np.array(yolo_layer['anchors']).reshape(-1, 2)
+
+
+def get_network_imagesize(cfg_data):
+    for layer in cfg_data:
+        if layer.name == 'net':
+            width = int(layer.param['width'])
+            height = int(layer.param['height'])
+            break
+    return (width, height)
+
 
 def _main():
+    cfg_file_path = 'yolov3.cfg'
+    cfg_data = parse_config(cfg_file_path)
+    anchors = get_yolo_anchors(cfg_data)
+    input_shape = get_network_imagesize(cfg_data)
     annotation_path = 'train.txt'
     log_dir = 'logs/000/'
     classes_path = 'model_data/voc_classes.txt'
-    anchors_path = 'model_data/yolo_anchors.txt'
     class_names = get_classes(classes_path)
+    
     num_classes = len(class_names)
-    anchors = get_anchors(anchors_path)
-
-    input_shape = (416,416) # multiple of 32, hw
+    raise
 
     model = create_model(input_shape, anchors, num_classes,
         freeze_body=2, weights_path='model_data/yolo_weights.h5') # make sure you know what you freeze
